@@ -4,6 +4,8 @@ use Polyfony\Response 	as Response;
 use Polyfony\Cache 		as Cache;
 use Polyfony\Config 	as Config;
 use Polyfony\Database 	as Database;
+use Polyfony\Query 		as Query;
+use Filemaker\Bridge 	as Bridge;
 
 class AliveController extends Polyfony\Controller {
 
@@ -48,6 +50,14 @@ class AliveController extends Polyfony\Controller {
 		
 		// check the cache 
 		try { $this->assertCacheStatus(); } 
+		catch (Exception $e) {
+			Response::setStatus(500);
+			Response::setContent(['error'=>$e->getMessage()]);
+			Response::render();
+		}
+
+		// check the bridge
+		try { $this->assertBridgeStatus(); } 
 		catch (Exception $e) {
 			Response::setStatus(500);
 			Response::setContent(['error'=>$e->getMessage()]);
@@ -130,6 +140,38 @@ class AliveController extends Polyfony\Controller {
 		}
 		// remove from the cache
 		Cache::remove(self::dummy_cache_variable);
+
+	}
+
+	private function assertBridgeStatus() :void {
+
+		// if test requested in the configuration file
+		if( Config::get('alive', 'assert_bridge_status') !== null && Config::get('alive', 'assert_bridge_status') == 1 ) {
+			$Request_query = new Query;
+			$Request_query->query( 
+				'SELECT "_id_site", "'. Config::get('alive','bridge_expected_column') .'" '.
+				'FROM "'. Config::get('alive','bridge_table') .'" WHERE "_id_site" = '.
+				Config::get('alive','bridge_id') 
+			);
+			$response = Bridge::execute( $Request_query );
+			// if test failed as a crash
+			if( is_null($response) ) {
+				Throw new Exception("Can't access the Filemaker database");
+			}
+			// if an error is found in the request, return it
+			elseif( isset($response['error'] ) ) {
+				Throw new Exception( $response['error'] );
+
+			} 
+			else {
+				if( 
+					$response[0]->get( Config::get('alive','bridge_expected_column_value') ) != 
+					Config::get('alive',' bridge_expected_column_value') 
+				) {
+					Throw new Exception("The object of the Filemaker database has a wrong match value");
+				}
+			}
+		}
 
 	}
 
