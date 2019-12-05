@@ -146,14 +146,19 @@ class AliveController extends Polyfony\Controller {
 	private function assertBridgeStatus() :void {
 
 		// if test requested in the configuration file
-		if( Config::get('alive', 'assert_bridge_status') == 1 ) {
-			$bridge_query = (new Query)
-			->query( 
-				'SELECT "_id_site", "'. Config::get('alive','bridge_expected_column') .'" '.
-				'FROM "'. Config::get('alive','bridge_table') .'" WHERE "_id_site" = '.
-				Config::get('alive','bridge_id') 
-			);
-			$response = Bridge::execute( $bridge_query );
+		if( Config::get('alive', 'assert_bridge_status') ) {
+			try {
+				$bridge_query = (new Query)
+				->query( 
+					'SELECT "_id_site", "'. Config::get('alive','bridge_expected_column') .'" '.
+					'FROM "'. Config::get('alive','bridge_table') .'" WHERE "_id_site" = '.
+					Config::get('alive','bridge_id') 
+				);
+				$response = Bridge::execute( $bridge_query );
+			} 
+			catch (Exception $e) {
+				Throw new Exception($e->getMessage());
+			}
 			// if test failed as a crash
 			if( is_null($response) ) {
 				Throw new Exception("Can't access the Filemaker database");
@@ -166,7 +171,7 @@ class AliveController extends Polyfony\Controller {
 				$response[0]->get( Config::get('alive','bridge_expected_column_value') ) != 
 				Config::get('alive',' bridge_expected_column_value') 
 			) {
-				Throw new Exception("The object of the Filemaker database has a wrong match value");
+				Throw new Exception("The object's column value differs from what we were expecting");
 			}
 		}
 
